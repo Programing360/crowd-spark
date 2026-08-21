@@ -11,7 +11,7 @@ import { useRouter } from "next/navigation";
 import { authClient, useSession } from "@/app/lib/auth-client";
 import type { AuthUser, UserRole } from "@/src/types/auth";
 
-const TOKEN_STORAGE_KEY = "fundverse_token";
+export const TOKEN_STORAGE_KEY = "fundverse_token";
 const VALID_ROLES: UserRole[] = ["Supporter", "Creator", "Admin"];
 
 interface AuthContextValue {
@@ -20,43 +20,78 @@ interface AuthContextValue {
   credits: number;
   isLoading: boolean;
   setCredits: (credits: number) => void;
+  applyAuthSession: (token: string, user: AuthSessionUser) => void;
   logout: () => Promise<void>;
+}
+
+export interface AuthSessionUser {
+  id?: string;
+  name?: string;
+  email?: string;
+  photoURL?: string | null;
+  image?: string | null;
+  role?: UserRole | string;
+  credits?: number;
 }
 
 export const AuthContext = createContext<AuthContextValue | null>(null);
 
 type RawUser = Record<string, unknown> & { id?: unknown };
 
+function normalizeUser(raw: AuthSessionUser, fallbackId = ""): AuthUser {
+  const role =
+    typeof raw.role === "string" && VALID_ROLES.includes(raw.role as UserRole)
+      ? (raw.role as UserRole)
+      : "Supporter";
+  return {
+    id: typeof raw.id === "string" && raw.id.length > 0 ? raw.id : fallbackId,
+    name:
+      typeof raw.name === "string" && raw.name.trim().length > 0
+        ? raw.name
+        : "FundVerse User",
+    email: typeof raw.email === "string" ? raw.email : "",
+    photoURL:
+      typeof raw.photoURL === "string"
+        ? raw.photoURL
+        : typeof raw.image === "string"
+          ? raw.image
+          : null,
+    role,
+  };
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const { data, isPending } = useSession();
   const [creditsOverride, setCreditsOverride] = useState<number | null>(null);
+  const [localUser, setLocalUser] = useState<AuthUser | null>(null);
 
   const rawUser = (data as { user?: RawUser } | null)?.user;
 
-  const user = useMemo<AuthUser | null>(() => {
+  const sessionUser = useMemo<AuthUser | null>(() => {
     if (!rawUser || typeof rawUser.id !== "string") return null;
-    const role =
-      typeof rawUser.role === "string" &&
-      VALID_ROLES.includes(rawUser.role as UserRole)
-        ? (rawUser.role as UserRole)
-        : "Supporter";
-    return {
-      id: rawUser.id,
-      name:
-        typeof rawUser.name === "string" && rawUser.name.trim().length > 0
-          ? rawUser.name
-          : "FundVerse User",
-      email: typeof rawUser.email === "string" ? rawUser.email : "",
-      photoURL: typeof rawUser.image === "string" ? rawUser.image : null,
-      role,
-    };
+    return normalizeUser(rawUser as AuthSessionUser, rawUser.id);
   }, [rawUser]);
+
+  const user = localUser ?? sessionUser;
 
   const sessionCredits =
     typeof rawUser?.credits === "number" && Number.isFinite(rawUser.credits)
       ? rawUser.credits
       : 0;
+
+  const applyAuthSession = useCallback(
+    (token: string, raw: AuthSessionUser) => {
+      window.localStorage.setItem(TOKEN_STORAGE_KEY, token);
+      if (typeof raw.credits === "number" && Number.isFinite(raw.credits)) {
+        setCreditsOverride(raw.credits);
+      } else {
+        setCreditsOverride(null);
+      }
+      setLocalUser(normalizeUser(raw));
+    },
+    [],
+  );
 
   const logout = useCallback(async () => {
     try {
@@ -64,6 +99,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await authClient.signOut();
     } finally {
       setCreditsOverride(null);
+      setLocalUser(null);
       router.replace("/login");
       router.refresh();
     }
@@ -76,9 +112,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       credits: creditsOverride ?? sessionCredits,
       isLoading: isPending,
       setCredits: setCreditsOverride,
+      applyAuthSession,
       logout,
     }),
-    [user, creditsOverride, sessionCredits, isPending, logout],
+    [user, creditsOverride, sessionCredits, isPending, applyAuthSession, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

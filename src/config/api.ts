@@ -1,9 +1,8 @@
 export const API_ENDPOINTS = {
-  register: "/api/v1/auth/register",
-  login: "/api/v1/auth/login",
-  google: "/api/v1/auth/google",
+  register: `${process.env.NEXT_PUBLIC_API_URL}/api/v1/auth/register`,
+  login: `${process.env.NEXT_PUBLIC_API_URL}/api/v1/auth/login`,
+  google: `${process.env.NEXT_PUBLIC_API_URL}/api/v1/auth/google`,
 } as const;
-
 export interface AuthApiResponse {
   access_token?: string;
   token?: string;
@@ -25,14 +24,19 @@ export async function postJson<T extends object>(
   body: T,
 ): Promise<{ ok: boolean; status: number; data: AuthApiResponse }> {
   let response: Response;
+  console.log(url);
   try {
     response = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
+
+    // console.log(response);
   } catch {
-    throw new Error("Network error. Please check your connection and try again.");
+    throw new Error(
+      "Network error. Please check your connection and try again.",
+    );
   }
 
   let data: AuthApiResponse = {};

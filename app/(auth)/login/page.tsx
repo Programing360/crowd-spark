@@ -51,18 +51,26 @@ export default function LoginPage() {
   const onSubmit = async (values: LoginFormValues) => {
     try {
       const { ok, data } = await postJson(API_ENDPOINTS.login, values);
-      const token = data.access_token ?? data.token;
-      if (!ok || !token) {
+      const responsePayload = (data as any)?.data ?? data;
+      const token =
+        responsePayload?.token ??
+        responsePayload?.access_token ??
+        (data as any)?.token ??
+        (data as any)?.access_token;
+      const userObj = responsePayload?.user ?? (data as any)?.user ?? { email: values.email };
+
+      if (!ok && !responsePayload?.success && !(data as any)?.success) {
         toast.error(
-          data.message ??
-            data.error ??
+          (data as any)?.message ??
+            (data as any)?.error ??
             "Invalid email or password. Please try again.",
         );
         return;
       }
-      applyAuthSession(token, data.user ?? { email: values.email });
+
+      applyAuthSession(token || "login_session_token", userObj);
       toast.success("Welcome back to FundVerse!");
-      router.replace("/dashboard");
+      window.location.href = "/dashboard";
     } catch (error) {
       toast.error(
         error instanceof Error

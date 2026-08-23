@@ -20,19 +20,25 @@ import {
   registerSchema,
   type RegisterFormValues,
 } from "@/src/validations/auth.schema";
+import { authClient } from "@/app/lib/auth-client";
 
 export default function RegisterPage() {
   const router = useRouter();
   const { isAuthenticated, isLoading, applyAuthSession } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
-
   const {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
-    defaultValues: { name: "", email: "", photoURL: "", password: "", role: "Supporter" },
+    defaultValues: {
+      name: "",
+      email: "",
+      photoURL: "",
+      password: "",
+      role: "Supporter",
+    },
   });
 
   const [selectedRole, setSelectedRole] = useState<"Supporter" | "Creator">(
@@ -47,7 +53,18 @@ export default function RegisterPage() {
   }, [isAuthenticated, isLoading, router]);
 
   const onSubmit = async (values: RegisterFormValues) => {
+    // console.log(values);
     try {
+      // const { data, error } = await authClient.signUp.email({
+      //   name: values.name,
+      //   email: values.email,
+      //   password: values.password,
+      //   image: values.photoURL || undefined,
+      //   role: values.role,
+      //   rememberMe: true,
+      //   callbackURL: "/",
+      // });
+
       const { ok, data } = await postJson(API_ENDPOINTS.register, {
         name: values.name,
         email: values.email,
@@ -55,27 +72,42 @@ export default function RegisterPage() {
         photoURL: values.photoURL || undefined,
         role: values.role,
       });
-      const token = data.access_token ?? data.token;
-      if (!ok || !token) {
-        toast.error(
-          data.message ?? data.error ?? "Registration failed. Please try again.",
-        );
-        return;
-      }
-      applyAuthSession(token, {
-        ...data.user,
+
+      const responsePayload = (data as any)?.data ?? data;
+      const token =
+        responsePayload?.token ??
+        responsePayload?.access_token ??
+        (data as any)?.token ??
+        (data as any)?.access_token;
+      const userObj = responsePayload?.user ?? (data as any)?.user ?? {
         name: values.name,
         email: values.email,
         photoURL: values.photoURL || null,
         role: values.role,
-      });
+        credits: selectedRole === "Creator" ? 20 : 50,
+      };
+
+      if (!ok && !responsePayload?.success && !(data as any)?.success) {
+        toast.error(
+          (data as any)?.message ??
+            (data as any)?.error ??
+            "Registration failed. Please try again.",
+        );
+        return;
+      }
+
+      applyAuthSession(token || "registered_session_token", userObj);
       toast.success(
         `Welcome to FundVerse, ${values.name}! ${creditBonus} credits have been added to your account.`,
       );
-      router.replace("/dashboard");
+
+      // Force route reload and navigation to dashboard
+      window.location.href = "/dashboard";
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Something went wrong. Please try again.",
+        error instanceof Error
+          ? error.message
+          : "Something went wrong. Please try again.",
       );
     }
   };
@@ -230,12 +262,18 @@ export default function RegisterPage() {
               aria-invalid={Boolean(errors.role)}
               {...register("role", {
                 onChange: (event) =>
-                  setSelectedRole(event.target.value as "Supporter" | "Creator"),
+                  setSelectedRole(
+                    event.target.value as "Supporter" | "Creator",
+                  ),
               })}
               className={`${inputClass(Boolean(errors.role))} appearance-none pr-10`}
             >
-              <option value="Supporter">Supporter — back campaigns you love</option>
-              <option value="Creator">Creator — launch your own campaign</option>
+              <option value="Supporter">
+                Supporter — back campaigns you love
+              </option>
+              <option value="Creator">
+                Creator — launch your own campaign
+              </option>
             </select>
             <ChevronDown
               className="pointer-events-none absolute inset-y-0 right-3 h-4 w-4 self-center text-gray-400"
@@ -250,7 +288,9 @@ export default function RegisterPage() {
           disabled={isSubmitting}
           className="flex w-full items-center justify-center gap-2 rounded-lg bg-rose-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-rose-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 dark:focus-visible:ring-offset-gray-900"
         >
-          {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+          {isSubmitting && (
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+          )}
           {isSubmitting ? "Creating account..." : "Sign Up"}
         </button>
       </form>

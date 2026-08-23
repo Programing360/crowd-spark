@@ -26,12 +26,12 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/src/hooks/useAuth";
 import type { UserRole } from "@/src/types/auth";
+import { useSession } from "@/app/lib/auth-client";
 
 const GITHUB_REPO_URL = "https://github.com/your-username/fundverse-client";
 
 const ROLE_BADGE_STYLES: Record<UserRole, string> = {
-  Supporter:
-    "bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300",
+  Supporter: "bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300",
   Creator:
     "bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300",
   Admin: "bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300",
@@ -91,7 +91,9 @@ function NavLink({
 }) {
   const pathname = usePathname();
   const isActive =
-    href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
+    href === "/"
+      ? pathname === "/"
+      : pathname === href || pathname.startsWith(`${href}/`);
   return (
     <Link
       href={href}
@@ -230,6 +232,11 @@ const subscribeNoop = () => () => {};
 export default function Navbar() {
   const { user, isAuthenticated, credits, isLoading, logout } = useAuth();
   const pathname = usePathname();
+  // const { data: session } = authClient.useSession();
+  // const user = session?.user;
+
+  // const data = fetch()
+  console.log(user);
 
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
@@ -254,7 +261,10 @@ export default function Navbar() {
   useEffect(() => {
     if (!isUserMenuOpen) return;
     function handlePointerDown(event: MouseEvent | TouchEvent) {
-      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+      if (
+        userMenuRef.current &&
+        !userMenuRef.current.contains(event.target as Node)
+      ) {
         setIsUserMenuOpen(false);
       }
     }
@@ -289,7 +299,7 @@ export default function Navbar() {
     const previouslyFocused = document.activeElement as HTMLElement | null;
     const getFocusable = () =>
       Array.from(
-        panel.querySelectorAll<HTMLElement>('a[href], button:not([disabled])'),
+        panel.querySelectorAll<HTMLElement>("a[href], button:not([disabled])"),
       );
     getFocusable()[0]?.focus();
     const handleTab = (event: globalThis.KeyboardEvent) => {
@@ -330,7 +340,9 @@ export default function Navbar() {
         [],
     );
     if (items.length === 0) return;
-    const currentIndex = items.findIndex((item) => item === document.activeElement);
+    const currentIndex = items.findIndex(
+      (item) => item === document.activeElement,
+    );
     let nextIndex: number;
     switch (event.key) {
       case "ArrowDown":
@@ -547,116 +559,128 @@ export default function Navbar() {
                 isMobileOpen ? "translate-x-0" : "invisible translate-x-full",
               )}
             >
-        <div className="flex h-16 shrink-0 items-center justify-between border-b border-gray-200 px-4 dark:border-gray-800">
-          <BrandMark />
-          <button
-            type="button"
-            onClick={closeMobileMenu}
-            aria-label="Close menu"
-            className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white"
-          >
-            <X className="h-6 w-6" aria-hidden="true" />
-          </button>
-        </div>
+              <div className="flex h-16 shrink-0 items-center justify-between border-b border-gray-200 px-4 dark:border-gray-800">
+                <BrandMark />
+                <button
+                  type="button"
+                  onClick={closeMobileMenu}
+                  aria-label="Close menu"
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white"
+                >
+                  <X className="h-6 w-6" aria-hidden="true" />
+                </button>
+              </div>
 
-        <div className="flex-1 overflow-y-auto px-3 py-4">
-          {isLoading ? (
-            <div className="space-y-3 px-1" aria-hidden="true">
-              <SkeletonPill className="h-11 w-full rounded-xl" />
-              <SkeletonPill className="h-16 w-full rounded-xl" />
-            </div>
-          ) : (
-            <div className="flex flex-col gap-1">
-              {isAuthenticated ? (
-                <NavLink href="/dashboard" variant="mobile" onNavigate={closeMobileMenu}>
-                  Dashboard
-                </NavLink>
-              ) : (
-                <NavLink href="/campaigns" variant="mobile" onNavigate={closeMobileMenu}>
-                  Explore Campaigns
-                </NavLink>
-              )}
-
-              {isAuthenticated && user && (
-                <div className="mt-4 rounded-2xl border border-gray-200 p-4 dark:border-gray-800">
-                  <div className="flex items-center gap-3">
-                    <Avatar src={user.photoURL} name={user.name} size="md" />
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-gray-900 dark:text-white">
-                        {user.name}
-                      </p>
-                      <p className="truncate text-xs text-gray-500 dark:text-gray-400">
-                        {user.email}
-                      </p>
-                    </div>
+              <div className="flex-1 overflow-y-auto px-3 py-4">
+                {isLoading ? (
+                  <div className="space-y-3 px-1" aria-hidden="true">
+                    <SkeletonPill className="h-11 w-full rounded-xl" />
+                    <SkeletonPill className="h-16 w-full rounded-xl" />
                   </div>
-                  <div className="mt-3 flex flex-wrap items-center gap-2">
-                    <span
-                      className={cx(
-                        "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold",
-                        ROLE_BADGE_STYLES[user.role],
-                      )}
+                ) : (
+                  <div className="flex flex-col gap-1">
+                    {isAuthenticated ? (
+                      <NavLink
+                        href="/dashboard"
+                        variant="mobile"
+                        onNavigate={closeMobileMenu}
+                      >
+                        Dashboard
+                      </NavLink>
+                    ) : (
+                      <NavLink
+                        href="/campaigns"
+                        variant="mobile"
+                        onNavigate={closeMobileMenu}
+                      >
+                        Explore Campaigns
+                      </NavLink>
+                    )}
+
+                    {isAuthenticated && user && (
+                      <div className="mt-4 rounded-2xl border border-gray-200 p-4 dark:border-gray-800">
+                        <div className="flex items-center gap-3">
+                          <Avatar
+                            src={user.photoURL}
+                            name={user.name}
+                            size="md"
+                          />
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold text-gray-900 dark:text-white">
+                              {user.name}
+                            </p>
+                            <p className="truncate text-xs text-gray-500 dark:text-gray-400">
+                              {user.email}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                          <span
+                            className={cx(
+                              "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold",
+                              ROLE_BADGE_STYLES[user.role],
+                            )}
+                          >
+                            {user.role}
+                          </span>
+                          <CreditsBadge credits={credits} />
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="my-4 border-t border-gray-200 dark:border-gray-800" />
+
+                    <a
+                      href={GITHUB_REPO_URL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={closeMobileMenu}
+                      className="flex items-center gap-3 rounded-xl px-4 py-3 text-base font-medium text-gray-700 transition-colors hover:bg-gray-100 hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 dark:text-gray-200 dark:hover:bg-gray-800 dark:hover:text-white"
                     >
-                      {user.role}
-                    </span>
-                    <CreditsBadge credits={credits} />
+                      <GithubIcon className="h-5 w-5 text-gray-400 dark:text-gray-500" />
+                      Join as Developer
+                    </a>
                   </div>
+                )}
+              </div>
+
+              {!isLoading && (
+                <div className="shrink-0 space-y-2 border-t border-gray-200 p-4 dark:border-gray-800">
+                  {isAuthenticated ? (
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      disabled={isLoggingOut}
+                      className="flex w-full items-center justify-center gap-2 rounded-xl border border-rose-200 px-4 py-3 text-sm font-semibold text-rose-600 transition-colors hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 disabled:opacity-60 dark:border-rose-500/30 dark:text-rose-400 dark:hover:bg-rose-500/10"
+                    >
+                      {isLoggingOut ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <LogOut className="h-4 w-4" />
+                      )}
+                      Logout
+                    </button>
+                  ) : (
+                    <>
+                      <Link
+                        href="/login"
+                        onClick={closeMobileMenu}
+                        className="flex w-full items-center justify-center gap-2 rounded-xl border border-gray-300 px-4 py-3 text-sm font-semibold text-gray-800 transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 dark:border-gray-700 dark:text-gray-100 dark:hover:bg-gray-800"
+                      >
+                        <UserRound className="h-4 w-4" />
+                        Login
+                      </Link>
+                      <Link
+                        href="/register"
+                        onClick={closeMobileMenu}
+                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-rose-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-rose-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500"
+                      >
+                        Register
+                      </Link>
+                    </>
+                  )}
                 </div>
               )}
-
-              <div className="my-4 border-t border-gray-200 dark:border-gray-800" />
-
-              <a
-                href={GITHUB_REPO_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={closeMobileMenu}
-                className="flex items-center gap-3 rounded-xl px-4 py-3 text-base font-medium text-gray-700 transition-colors hover:bg-gray-100 hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 dark:text-gray-200 dark:hover:bg-gray-800 dark:hover:text-white"
-              >
-                <GithubIcon className="h-5 w-5 text-gray-400 dark:text-gray-500" />
-                Join as Developer
-              </a>
-            </div>
-          )}
-        </div>
-
-        {!isLoading && (
-          <div className="shrink-0 space-y-2 border-t border-gray-200 p-4 dark:border-gray-800">
-            {isAuthenticated ? (
-              <button
-                type="button"
-                onClick={handleLogout}
-                disabled={isLoggingOut}
-                className="flex w-full items-center justify-center gap-2 rounded-xl border border-rose-200 px-4 py-3 text-sm font-semibold text-rose-600 transition-colors hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 disabled:opacity-60 dark:border-rose-500/30 dark:text-rose-400 dark:hover:bg-rose-500/10"
-              >
-                {isLoggingOut ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <LogOut className="h-4 w-4" />
-                )}
-                Logout
-              </button>
-            ) : (
-              <>
-                <Link
-                  href="/login"
-                  onClick={closeMobileMenu}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-gray-300 px-4 py-3 text-sm font-semibold text-gray-800 transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 dark:border-gray-700 dark:text-gray-100 dark:hover:bg-gray-800"
-                >
-                  <UserRound className="h-4 w-4" />
-                  Login
-                </Link>
-                <Link
-                  href="/register"
-                  onClick={closeMobileMenu}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-rose-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-rose-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500"
-                >
-                  Register
-                </Link>
-              </>
-            )}
-          </div>
-        )}
             </aside>
           </>,
           document.body,

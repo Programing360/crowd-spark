@@ -20,6 +20,7 @@ export interface Campaign {
   status?: string;
   creatorName?: string;
   backersCount?: number;
+  rewardInfo?: string;
 }
 
 const FALLBACK_CAMPAIGNS: Campaign[] = [

@@ -3,6 +3,7 @@
 import {
   createContext,
   useCallback,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -42,13 +43,23 @@ function normalizeUser(raw: AuthSessionUser, fallbackId = ""): AuthUser {
   const role =
     typeof raw.role === "string" && VALID_ROLES.includes(raw.role as UserRole)
       ? (raw.role as UserRole)
-      : "Supporter";
+      : "Creator";
+
+  const rawId =
+    typeof raw.id === "string" && raw.id.length > 0
+      ? raw.id
+      : typeof (raw as { _id?: string })._id === "string"
+        ? (raw as { _id: string })._id
+        : fallbackId || "user_default";
+
   return {
-    id: typeof raw.id === "string" && raw.id.length > 0 ? raw.id : fallbackId,
+    id: rawId,
     name:
       typeof raw.name === "string" && raw.name.trim().length > 0
         ? raw.name
-        : "FundVerse User",
+        : typeof raw.email === "string" && raw.email.includes("@")
+          ? raw.email.split("@")[0]
+          : "FundVerse User",
     email: typeof raw.email === "string" ? raw.email : "",
     photoURL:
       typeof raw.photoURL === "string"
@@ -65,12 +76,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const { data, isPending } = useSession();
   const [creditsOverride, setCreditsOverride] = useState<number | null>(null);
   const [localUser, setLocalUser] = useState<AuthUser | null>(null);
+  const [initialized, setInitialized] = useState<boolean>(false);
 
-  const rawUser = (data as { user?: RawUser } | null)?.user;
+  // Restore session from localStorage on initial client mount
+  useEffect(() => {
+    try {
+      const storedUserJson = window.localStorage.getItem("fundverse_user");
+      const storedCredits = window.localStorage.getItem("fundverse_credits");
+
+      if (storedUserJson) {
+        const parsed = JSON.parse(storedUserJson);
+        if (parsed && typeof parsed === "object") {
+          setLocalUser(normalizeUser(parsed as AuthSessionUser));
+        }
+      }
+      if (storedCredits !== null && !isNaN(Number(storedCredits))) {
+        setCreditsOverride(Number(storedCredits));
+      }
+    } catch (e) {
+      console.warn("Failed to restore session from localStorage", e);
+    } finally {
+      setInitialized(true);
+    }
+  }, []);
+
+  // Safely extract raw user from Better Auth session data variations
+  const rawUser = useMemo<AuthSessionUser | null>(() => {
+    if (!data) return null;
+    const sessionObj = (data as { data?: unknown }).data ?? data;
+    if (sessionObj && typeof sessionObj === "object") {
+      if ("user" in sessionObj && sessionObj.user && typeof sessionObj.user === "object") {
+        return sessionObj.user as AuthSessionUser;
+      }
+      if ("email" in sessionObj || "id" in sessionObj || "_id" in sessionObj) {
+        return sessionObj as AuthSessionUser;
+      }
+    }
+    return null;
+  }, [data]);
 
   const sessionUser = useMemo<AuthUser | null>(() => {
-    if (!rawUser || typeof rawUser.id !== "string") return null;
-    return normalizeUser(rawUser as AuthSessionUser, rawUser.id);
+    if (!rawUser) return null;
+    return normalizeUser(rawUser);
   }, [rawUser]);
 
   const user = localUser ?? sessionUser;
@@ -78,25 +125,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const sessionCredits =
     typeof rawUser?.credits === "number" && Number.isFinite(rawUser.credits)
       ? rawUser.credits
-      : 0;
+      : 5000;
 
   const applyAuthSession = useCallback(
     (token: string, raw: AuthSessionUser) => {
       window.localStorage.setItem(TOKEN_STORAGE_KEY, token);
-      if (typeof raw.credits === "number" && Number.isFinite(raw.credits)) {
-        setCreditsOverride(raw.credits);
-      } else {
-        setCreditsOverride(null);
-      }
+      window.localStorage.setItem("fundverse_user", JSON.stringify(raw));
+
+      const newCredits = typeof raw.credits === "number" && Number.isFinite(raw.credits) ? raw.credits : 5000;
+      window.localStorage.setItem("fundverse_credits", String(newCredits));
+      setCreditsOverride(newCredits);
       setLocalUser(normalizeUser(raw));
     },
     [],
   );
 
+  const setCredits = useCallback((newCredits: number) => {
+    setCreditsOverride(newCredits);
+    window.localStorage.setItem("fundverse_credits", String(newCredits));
+  }, []);
+
   const logout = useCallback(async () => {
     try {
       window.localStorage.removeItem(TOKEN_STORAGE_KEY);
+      window.localStorage.removeItem("fundverse_user");
+      window.localStorage.removeItem("fundverse_credits");
       await authClient.signOut();
+    } catch {
+      // Ignore network signout errors
     } finally {
       setCreditsOverride(null);
       setLocalUser(null);
@@ -110,13 +166,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       isAuthenticated: user !== null,
       credits: creditsOverride ?? sessionCredits,
-      isLoading: isPending,
-      setCredits: setCreditsOverride,
+      isLoading: (isPending || !initialized) && user === null,
+      setCredits,
       applyAuthSession,
       logout,
     }),
-    [user, creditsOverride, sessionCredits, isPending, applyAuthSession, logout],
+    [user, creditsOverride, sessionCredits, isPending, initialized, setCredits, applyAuthSession, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
+
+
